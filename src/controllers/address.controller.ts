@@ -1,3 +1,6 @@
+// 2) AddressController usando AddressService
+// src/controllers/address.controller.ts
+
 import { Request, Response, NextFunction } from "express";
 import { AddressService } from "../services/address.services";
 
@@ -7,9 +10,8 @@ export class AddressController {
   static async getAddresses(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-      const data = await addressService.getAddresses(userId);
-
-      return res.json(data);
+      const addresses = await addressService.getUserAddresses(userId);
+      res.json(addresses);
     } catch (error) {
       next(error);
     }
@@ -18,11 +20,8 @@ export class AddressController {
   static async createAddress(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-      const data = req.body;
-
-      const address = await addressService.createAddress(userId, data);
-
-      return res.status(201).json(address);
+      const address = await addressService.createAddress(userId, req.body);
+      res.status(201).json(address);
     } catch (error) {
       next(error);
     }
@@ -30,12 +29,10 @@ export class AddressController {
 
   static async updateAddress(req: Request, res: Response, next: NextFunction) {
     try {
+      const userId = (req as any).user.id;
       const id = Number(req.params.id);
-      const data = req.body;
-
-      const updated = await addressService.updateAddress(id, data);
-
-      return res.json(updated);
+      const address = await addressService.updateAddress(userId, id, req.body);
+      res.json(address);
     } catch (error) {
       next(error);
     }
@@ -43,11 +40,10 @@ export class AddressController {
 
   static async deleteAddress(req: Request, res: Response, next: NextFunction) {
     try {
+      const userId = (req as any).user.id;
       const id = Number(req.params.id);
-
-      const removed = await addressService.deleteAddress(id);
-
-      return res.json(removed);
+      await addressService.deleteAddress(userId, id);
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

@@ -1,5 +1,7 @@
+// src/controllers/cart.controller.ts
+
 import { Request, Response, NextFunction } from "express";
-import { CartService } from "../services/cart.services";
+import { CartService } from "../services/cart.service";
 
 const cartService = new CartService();
 
@@ -8,8 +10,7 @@ export class CartController {
     try {
       const userId = (req as any).user.id;
       const cart = await cartService.getCart(userId);
-
-      return res.json(cart);
+      res.json(cart);
     } catch (error) {
       next(error);
     }
@@ -19,10 +20,9 @@ export class CartController {
     try {
       const userId = (req as any).user.id;
       const { productId, quantity } = req.body;
-
-      const cart = await cartService.addToCart(userId, productId, quantity);
-
-      return res.json(cart);
+      await cartService.addToCart(userId, Number(productId), Number(quantity || 1));
+      const cart = await cartService.getCart(userId);
+      res.json(cart);
     } catch (error) {
       next(error);
     }
@@ -32,14 +32,9 @@ export class CartController {
     try {
       const userId = (req as any).user.id;
       const { productId, quantity } = req.body;
-
-      const cart = await cartService.updateCartItem(
-        userId,
-        productId,
-        quantity
-      );
-
-      return res.json(cart);
+      await cartService.updateItem(userId, Number(productId), Number(quantity));
+      const cart = await cartService.getCart(userId);
+      res.json(cart);
     } catch (error) {
       next(error);
     }
@@ -49,10 +44,20 @@ export class CartController {
     try {
       const userId = (req as any).user.id;
       const productId = Number(req.params.productId);
+      await cartService.removeItem(userId, productId);
+      const cart = await cartService.getCart(userId);
+      res.json(cart);
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      const cart = await cartService.removeFromCart(userId, productId);
-
-      return res.json(cart);
+  static async clearCart(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      await cartService.clearCart(userId);
+      const cart = await cartService.getCart(userId);
+      res.json(cart);
     } catch (error) {
       next(error);
     }

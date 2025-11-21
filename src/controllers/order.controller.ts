@@ -15,11 +15,18 @@ export class OrderController {
     }
   }
 
-  static async getUserOrders(req: Request, res: Response, next: NextFunction) {
+    static async getUserOrders(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-      const orders = await orderService.getUserOrders(userId);
-      return res.json(orders);
+      const orders = await prisma.order.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        include: {
+          items: { include: { product: true } },
+          address: true,
+        },
+      });
+      res.json(orders);
     } catch (error) {
       next(error);
     }
@@ -45,7 +52,6 @@ export class OrderController {
         },
         orderBy: { createdAt: "desc" },
       });
-
       return res.json(orders);
     } catch (error) {
       next(error);
@@ -60,6 +66,15 @@ export class OrderController {
       const updated = await prisma.order.update({
         where: { id },
         data: { status, cancelReason },
+        include: {
+          user: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          address: true,
+        },
       });
 
       return res.json(updated);
@@ -67,4 +82,5 @@ export class OrderController {
       next(error);
     }
   }
+
 }

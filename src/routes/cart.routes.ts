@@ -1,3 +1,5 @@
+// src/routes/cart.routes.ts
+
 import { Router } from "express";
 import { CartController } from "../controllers/cart.controller";
 import { authRequired } from "../middleware/auth.middleware";
@@ -8,5 +10,6 @@ router.get("/", authRequired, CartController.getCart);
 router.post("/add", authRequired, CartController.addToCart);
 router.put("/", authRequired, CartController.updateItem);
 router.delete("/:productId", authRequired, CartController.removeItem);
+router.delete("/", authRequired, CartController.clearCart);
 
 export default router;
