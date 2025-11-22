@@ -6,6 +6,7 @@ import { OrderController } from "../controllers/order.controller";
 import { UserController } from "../controllers/user.controller";
 import { authRequired } from "../middleware/auth.middleware";
 import { isAdmin } from "../middleware/admin.middleware";
+import { uploadImages } from "../middleware/uploadImages";
 
 const router = Router();
 
@@ -14,7 +15,9 @@ router.use(authRequired, isAdmin);
 
 // Productos
 router.get("/products", ProductController.getAll);
-router.post("/products", ProductController.create);
+router.get("/products/:id", ProductController.getById); // 👈 para cargar en edición
+router.post("/products", uploadImages, ProductController.create);
+router.put("/products/:id", uploadImages, ProductController.update); // 👈 actualizar
 router.patch("/products/:id/status", ProductController.updateStatus);
 
 // Categorías

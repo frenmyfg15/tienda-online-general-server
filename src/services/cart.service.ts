@@ -1,4 +1,4 @@
-// src/services/cart.service.ts
+// src/services/cart.services.ts
 
 import { prisma } from "../prisma/client";
 import { ServiceError } from "../utils/errorHandler";

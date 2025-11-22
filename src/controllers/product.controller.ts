@@ -1,5 +1,4 @@
 // src/controllers/product.controller.ts
-
 import { Request, Response, NextFunction } from "express";
 import { ProductService } from "../services/product.services";
 
@@ -46,8 +45,24 @@ export class ProductController {
 
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const r = await productService.createProduct(req.body);
+      const files = (req.files as Express.Multer.File[]) ?? [];
+      const data = req.body;
+
+      const r = await productService.createProduct(data, files);
       res.status(201).json(r);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+      const files = (req.files as Express.Multer.File[]) ?? [];
+      const data = req.body;
+
+      const r = await productService.updateProduct(id, data, files);
+      res.json(r);
     } catch (e) {
       next(e);
     }
