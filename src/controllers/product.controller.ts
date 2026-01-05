@@ -78,4 +78,17 @@ export class ProductController {
       next(e);
     }
   }
+
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+
+      const r = await productService.deleteProduct(id);
+
+      res.json(r);
+    } catch (e) {
+      next(e);
+    }
+  }
+
 }

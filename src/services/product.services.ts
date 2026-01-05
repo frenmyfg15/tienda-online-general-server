@@ -66,6 +66,23 @@ const uploadBufferToCloudinary = (
   });
 };
 
+const extractCloudinaryPublicId = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean); // quita vacíos
+    const last = parts[parts.length - 1]; // nombre.ext
+    const [filename] = last.split(".");
+    const folderIndex = parts.findIndex((p) => p === "products");
+    if (folderIndex !== -1) {
+      return `products/${filename}`;
+    }
+    return filename;
+  } catch {
+    return null;
+  }
+};
+
+
 const makeUniqueSlug = async (
   baseSlug: string,
   ignoreId?: number
@@ -530,4 +547,60 @@ export class ProductService {
       data: { isActive },
     });
   }
+
+  @ServiceError()
+  async deleteProduct(id: number) {
+    // 1. Buscar el producto con sus relaciones relevantes
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        orderItems: true,
+        images: true,
+      },
+    });
+
+    if (!product) {
+      const e: any = new Error("Product not found");
+      e.status = 404;
+      throw e;
+    }
+
+    // 2. Si tiene pedidos asociados, no permitimos borrarlo
+    if (product.orderItems.length > 0) {
+      const e: any = new Error(
+        "Cannot delete product with existing orders"
+      );
+      e.status = 400; // o 409 Conflict, como prefieras
+      throw e;
+    }
+
+    // 3. (Opcional) Borrar imágenes de Cloudinary de forma best-effort
+    if (product.images.length > 0) {
+      await Promise.all(
+        product.images.map(async (img) => {
+          const publicId = extractCloudinaryPublicId(img.url);
+          if (!publicId) return;
+          try {
+            await cloudinary.uploader.destroy(publicId);
+          } catch (err) {
+            // No rompemos el flujo si falla Cloudinary, solo log
+            console.error("Error deleting Cloudinary image", publicId, err);
+          }
+        })
+      );
+    }
+
+    // 4. Borrar en cascada las relaciones y finalmente el producto
+    await prisma.$transaction([
+      prisma.productImage.deleteMany({ where: { productId: id } }),
+      prisma.productVariant.deleteMany({ where: { productId: id } }),
+      prisma.productAttributeValue.deleteMany({ where: { productId: id } }),
+      prisma.cartItem.deleteMany({ where: { productId: id } }),
+      // En este punto no hay OrderItem, ya lo hemos comprobado antes
+      prisma.product.delete({ where: { id } }),
+    ]);
+
+    return { success: true };
+  }
+
 }

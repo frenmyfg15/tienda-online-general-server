@@ -15,10 +15,11 @@ router.use(authRequired, isAdmin);
 
 // Productos
 router.get("/products", ProductController.getAll);
-router.get("/products/:id", ProductController.getById); // 👈 para cargar en edición
+router.get("/products/:id", ProductController.getById);
 router.post("/products", uploadImages, ProductController.create);
-router.put("/products/:id", uploadImages, ProductController.update); // 👈 actualizar
+router.put("/products/:id", uploadImages, ProductController.update);
 router.patch("/products/:id/status", ProductController.updateStatus);
+router.delete("/products/:id", ProductController.delete);
 
 // Categorías
 router.get("/categories", CategoryController.getAll);
