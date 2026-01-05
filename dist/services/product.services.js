@@ -34,13 +34,12 @@ const uploadBufferToCloudinary = (buffer) => {
 const extractCloudinaryPublicId = (url) => {
     try {
         const u = new URL(url);
-        const parts = u.pathname.split("/").filter(Boolean); // quita vacíos
-        const last = parts[parts.length - 1]; // nombre.ext
+        const parts = u.pathname.split("/").filter(Boolean);
+        const last = parts[parts.length - 1];
         const [filename] = last.split(".");
         const folderIndex = parts.findIndex((p) => p === "products");
-        if (folderIndex !== -1) {
+        if (folderIndex !== -1)
             return `products/${filename}`;
-        }
         return filename;
     }
     catch {
@@ -50,7 +49,6 @@ const extractCloudinaryPublicId = (url) => {
 const makeUniqueSlug = async (baseSlug, ignoreId) => {
     let slug = baseSlug;
     let counter = 1;
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const existing = await client_1.prisma.product.findUnique({
             where: { slug },
@@ -105,8 +103,15 @@ const parseTags = (v) => {
     return undefined;
 };
 class ProductService {
+    // ==============================
+    // LISTADO (solo activos + cat activa)
+    // ==============================
     async getAllProducts() {
         return client_1.prisma.product.findMany({
+            where: {
+                isActive: true,
+                category: { isActive: true },
+            },
             include: {
                 category: true,
                 images: true,
@@ -116,9 +121,16 @@ class ProductService {
             orderBy: { createdAt: "desc" },
         });
     }
+    // ==============================
+    // DETALLE POR ID (aplica misma regla)
+    // ==============================
     async getProductById(id) {
-        const p = await client_1.prisma.product.findUnique({
-            where: { id },
+        const p = await client_1.prisma.product.findFirst({
+            where: {
+                id,
+                isActive: true,
+                category: { isActive: true },
+            },
             include: {
                 category: true,
                 images: true,
@@ -133,11 +145,16 @@ class ProductService {
         }
         return p;
     }
+    // ==============================
+    // BUSCADOR
+    // ==============================
     async searchProducts(q) {
         if (!q)
             return [];
         return client_1.prisma.product.findMany({
             where: {
+                isActive: true,
+                category: { isActive: true },
                 OR: [
                     { name: { contains: q } },
                     { description: { contains: q } },
@@ -149,14 +166,24 @@ class ProductService {
             include: { category: true },
         });
     }
+    // ==============================
+    // RANDOM
+    // ==============================
     async getRandomProducts(limit = 20) {
         const all = await client_1.prisma.product.findMany({
+            where: {
+                isActive: true,
+                category: { isActive: true },
+            },
             include: { category: true },
         });
         if (all.length <= limit)
             return all;
         return [...all].sort(() => Math.random() - 0.5).slice(0, limit);
     }
+    // ==============================
+    // CREAR
+    // ==============================
     async createProduct(rawData, files = []) {
         if (!rawData) {
             const e = new Error("Invalid product data");
@@ -166,9 +193,7 @@ class ProductService {
         const data = {
             name: String(rawData.name),
             slug: rawData.slug ? String(rawData.slug) : undefined,
-            description: rawData.description
-                ? String(rawData.description)
-                : undefined,
+            description: rawData.description ? String(rawData.description) : undefined,
             price: Number(rawData.price),
             compareAtPrice: parseNumber(rawData.compareAtPrice),
             costPrice: parseNumber(rawData.costPrice),
@@ -253,6 +278,9 @@ class ProductService {
             },
         });
     }
+    // ==============================
+    // ACTUALIZAR
+    // ==============================
     async updateProduct(id, rawData, files = []) {
         const existing = await client_1.prisma.product.findUnique({
             where: { id },
@@ -431,6 +459,9 @@ class ProductService {
             },
         });
     }
+    // ==============================
+    // ACTIVAR / DESACTIVAR
+    // ==============================
     async setProductStatus(id, isActive) {
         const exists = await client_1.prisma.product.findUnique({ where: { id } });
         if (!exists) {
@@ -443,8 +474,10 @@ class ProductService {
             data: { isActive },
         });
     }
+    // ==============================
+    // ELIMINAR
+    // ==============================
     async deleteProduct(id) {
-        // 1. Buscar el producto con sus relaciones relevantes
         const product = await client_1.prisma.product.findUnique({
             where: { id },
             include: {
@@ -457,13 +490,11 @@ class ProductService {
             e.status = 404;
             throw e;
         }
-        // 2. Si tiene pedidos asociados, no permitimos borrarlo
         if (product.orderItems.length > 0) {
             const e = new Error("Cannot delete product with existing orders");
-            e.status = 400; // o 409 Conflict, como prefieras
+            e.status = 400;
             throw e;
         }
-        // 3. (Opcional) Borrar imágenes de Cloudinary de forma best-effort
         if (product.images.length > 0) {
             await Promise.all(product.images.map(async (img) => {
                 const publicId = extractCloudinaryPublicId(img.url);
@@ -473,18 +504,15 @@ class ProductService {
                     await cloudinary_1.default.uploader.destroy(publicId);
                 }
                 catch (err) {
-                    // No rompemos el flujo si falla Cloudinary, solo log
                     console.error("Error deleting Cloudinary image", publicId, err);
                 }
             }));
         }
-        // 4. Borrar en cascada las relaciones y finalmente el producto
         await client_1.prisma.$transaction([
             client_1.prisma.productImage.deleteMany({ where: { productId: id } }),
             client_1.prisma.productVariant.deleteMany({ where: { productId: id } }),
             client_1.prisma.productAttributeValue.deleteMany({ where: { productId: id } }),
             client_1.prisma.cartItem.deleteMany({ where: { productId: id } }),
-            // En este punto no hay OrderItem, ya lo hemos comprobado antes
             client_1.prisma.product.delete({ where: { id } }),
         ]);
         return { success: true };

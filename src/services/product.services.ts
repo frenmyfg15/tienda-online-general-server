@@ -69,19 +69,16 @@ const uploadBufferToCloudinary = (
 const extractCloudinaryPublicId = (url: string): string | null => {
   try {
     const u = new URL(url);
-    const parts = u.pathname.split("/").filter(Boolean); // quita vacíos
-    const last = parts[parts.length - 1]; // nombre.ext
+    const parts = u.pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1];
     const [filename] = last.split(".");
     const folderIndex = parts.findIndex((p) => p === "products");
-    if (folderIndex !== -1) {
-      return `products/${filename}`;
-    }
+    if (folderIndex !== -1) return `products/${filename}`;
     return filename;
   } catch {
     return null;
   }
 };
-
 
 const makeUniqueSlug = async (
   baseSlug: string,
@@ -90,7 +87,6 @@ const makeUniqueSlug = async (
   let slug = baseSlug;
   let counter = 1;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const existing = await prisma.product.findUnique({
       where: { slug },
@@ -146,9 +142,16 @@ const parseTags = (v: any): string[] | undefined => {
 };
 
 export class ProductService {
+  // ==============================
+  // LISTADO (solo activos + cat activa)
+  // ==============================
   @ServiceError()
   async getAllProducts() {
     return prisma.product.findMany({
+      where: {
+        isActive: true,
+        category: { isActive: true },
+      },
       include: {
         category: true,
         images: true,
@@ -159,10 +162,17 @@ export class ProductService {
     });
   }
 
+  // ==============================
+  // DETALLE POR ID (aplica misma regla)
+  // ==============================
   @ServiceError()
   async getProductById(id: number) {
-    const p = await prisma.product.findUnique({
-      where: { id },
+    const p = await prisma.product.findFirst({
+      where: {
+        id,
+        isActive: true,
+        category: { isActive: true },
+      },
       include: {
         category: true,
         images: true,
@@ -170,20 +180,27 @@ export class ProductService {
         attributes: true,
       },
     });
+
     if (!p) {
       const e: any = new Error("Product not found");
       e.status = 404;
       throw e;
     }
+
     return p;
   }
 
+  // ==============================
+  // BUSCADOR
+  // ==============================
   @ServiceError()
   async searchProducts(q: string) {
     if (!q) return [];
 
     return prisma.product.findMany({
       where: {
+        isActive: true,
+        category: { isActive: true },
         OR: [
           { name: { contains: q } },
           { description: { contains: q } },
@@ -196,20 +213,28 @@ export class ProductService {
     });
   }
 
+  // ==============================
+  // RANDOM
+  // ==============================
   @ServiceError()
   async getRandomProducts(limit = 20) {
     const all = await prisma.product.findMany({
+      where: {
+        isActive: true,
+        category: { isActive: true },
+      },
       include: { category: true },
     });
+
     if (all.length <= limit) return all;
     return [...all].sort(() => Math.random() - 0.5).slice(0, limit);
   }
 
+  // ==============================
+  // CREAR
+  // ==============================
   @ServiceError()
-  async createProduct(
-    rawData: any,
-    files: Express.Multer.File[] = []
-  ) {
+  async createProduct(rawData: any, files: Express.Multer.File[] = []) {
     if (!rawData) {
       const e: any = new Error("Invalid product data");
       e.status = 400;
@@ -219,9 +244,7 @@ export class ProductService {
     const data: CreateProductInput = {
       name: String(rawData.name),
       slug: rawData.slug ? String(rawData.slug) : undefined,
-      description: rawData.description
-        ? String(rawData.description)
-        : undefined,
+      description: rawData.description ? String(rawData.description) : undefined,
       price: Number(rawData.price),
       compareAtPrice: parseNumber(rawData.compareAtPrice),
       costPrice: parseNumber(rawData.costPrice),
@@ -315,6 +338,9 @@ export class ProductService {
     });
   }
 
+  // ==============================
+  // ACTUALIZAR
+  // ==============================
   @ServiceError()
   async updateProduct(
     id: number,
@@ -533,6 +559,9 @@ export class ProductService {
     });
   }
 
+  // ==============================
+  // ACTIVAR / DESACTIVAR
+  // ==============================
   @ServiceError()
   async setProductStatus(id: number, isActive: boolean) {
     const exists = await prisma.product.findUnique({ where: { id } });
@@ -548,9 +577,11 @@ export class ProductService {
     });
   }
 
+  // ==============================
+  // ELIMINAR
+  // ==============================
   @ServiceError()
   async deleteProduct(id: number) {
-    // 1. Buscar el producto con sus relaciones relevantes
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
@@ -565,16 +596,14 @@ export class ProductService {
       throw e;
     }
 
-    // 2. Si tiene pedidos asociados, no permitimos borrarlo
     if (product.orderItems.length > 0) {
       const e: any = new Error(
         "Cannot delete product with existing orders"
       );
-      e.status = 400; // o 409 Conflict, como prefieras
+      e.status = 400;
       throw e;
     }
 
-    // 3. (Opcional) Borrar imágenes de Cloudinary de forma best-effort
     if (product.images.length > 0) {
       await Promise.all(
         product.images.map(async (img) => {
@@ -583,24 +612,20 @@ export class ProductService {
           try {
             await cloudinary.uploader.destroy(publicId);
           } catch (err) {
-            // No rompemos el flujo si falla Cloudinary, solo log
             console.error("Error deleting Cloudinary image", publicId, err);
           }
         })
       );
     }
 
-    // 4. Borrar en cascada las relaciones y finalmente el producto
     await prisma.$transaction([
       prisma.productImage.deleteMany({ where: { productId: id } }),
       prisma.productVariant.deleteMany({ where: { productId: id } }),
       prisma.productAttributeValue.deleteMany({ where: { productId: id } }),
       prisma.cartItem.deleteMany({ where: { productId: id } }),
-      // En este punto no hay OrderItem, ya lo hemos comprobado antes
       prisma.product.delete({ where: { id } }),
     ]);
 
     return { success: true };
   }
-
 }

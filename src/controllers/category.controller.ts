@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma/client";
+import { CategoryService } from "../services/category.services";
+
+const categoryService = new CategoryService();
 
 export class CategoryController {
   static async getAll(req: Request, res: Response, next: NextFunction) {
@@ -42,6 +45,44 @@ export class CategoryController {
       });
 
       return res.status(201).json(category);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE — elimina solo si no hay productos asociados
+   */
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+
+      const deleted = await categoryService.deleteCategory(id);
+
+      return res.json({
+        success: true,
+        message: "Categoría eliminada correctamente",
+        category: deleted,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH — desactivar categoría (plan B si no se puede eliminar)
+   */
+  static async deactivate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = Number(req.params.id);
+
+      const updated = await categoryService.deactivateCategory(id);
+
+      return res.json({
+        success: true,
+        message: "Categoría desactivada",
+        category: updated,
+      });
     } catch (error) {
       next(error);
     }

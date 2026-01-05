@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CategoryController = void 0;
 const client_1 = require("../prisma/client");
+const category_services_1 = require("../services/category.services");
+const categoryService = new category_services_1.CategoryService();
 class CategoryController {
     static async getAll(req, res, next) {
         try {
@@ -39,6 +41,40 @@ class CategoryController {
                 data: { name, slug },
             });
             return res.status(201).json(category);
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * DELETE — elimina solo si no hay productos asociados
+     */
+    static async delete(req, res, next) {
+        try {
+            const id = Number(req.params.id);
+            const deleted = await categoryService.deleteCategory(id);
+            return res.json({
+                success: true,
+                message: "Categoría eliminada correctamente",
+                category: deleted,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    /**
+     * PATCH — desactivar categoría (plan B si no se puede eliminar)
+     */
+    static async deactivate(req, res, next) {
+        try {
+            const id = Number(req.params.id);
+            const updated = await categoryService.deactivateCategory(id);
+            return res.json({
+                success: true,
+                message: "Categoría desactivada",
+                category: updated,
+            });
         }
         catch (error) {
             next(error);
