@@ -1,5 +1,4 @@
 "use strict";
-// src/controllers/product.controller.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProductController = void 0;
 const product_services_1 = require("../services/product.services");
@@ -45,8 +44,22 @@ class ProductController {
     }
     static async create(req, res, next) {
         try {
-            const r = await productService.createProduct(req.body);
+            const files = req.files ?? [];
+            const data = req.body;
+            const r = await productService.createProduct(data, files);
             res.status(201).json(r);
+        }
+        catch (e) {
+            next(e);
+        }
+    }
+    static async update(req, res, next) {
+        try {
+            const id = Number(req.params.id);
+            const files = req.files ?? [];
+            const data = req.body;
+            const r = await productService.updateProduct(id, data, files);
+            res.json(r);
         }
         catch (e) {
             next(e);
@@ -57,6 +70,16 @@ class ProductController {
             const id = Number(req.params.id);
             const { isActive } = req.body;
             const r = await productService.setProductStatus(id, Boolean(isActive));
+            res.json(r);
+        }
+        catch (e) {
+            next(e);
+        }
+    }
+    static async delete(req, res, next) {
+        try {
+            const id = Number(req.params.id);
+            const r = await productService.deleteProduct(id);
             res.json(r);
         }
         catch (e) {

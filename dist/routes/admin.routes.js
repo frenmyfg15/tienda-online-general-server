@@ -8,13 +8,17 @@ const order_controller_1 = require("../controllers/order.controller");
 const user_controller_1 = require("../controllers/user.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const admin_middleware_1 = require("../middleware/admin.middleware");
+const uploadImages_1 = require("../middleware/uploadImages");
 const router = (0, express_1.Router)();
 // Todas las rutas de admin requieren estar logueado y ser admin
 router.use(auth_middleware_1.authRequired, admin_middleware_1.isAdmin);
 // Productos
 router.get("/products", product_controller_1.ProductController.getAll);
-router.post("/products", product_controller_1.ProductController.create);
+router.get("/products/:id", product_controller_1.ProductController.getById);
+router.post("/products", uploadImages_1.uploadImages, product_controller_1.ProductController.create);
+router.put("/products/:id", uploadImages_1.uploadImages, product_controller_1.ProductController.update);
 router.patch("/products/:id/status", product_controller_1.ProductController.updateStatus);
+router.delete("/products/:id", product_controller_1.ProductController.delete);
 // Categorías
 router.get("/categories", category_controller_1.CategoryController.getAll);
 router.post("/categories", category_controller_1.CategoryController.create);
